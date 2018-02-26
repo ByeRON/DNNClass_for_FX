@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 from dataset_kebin.candle import load_candle
 
+import matplotlib.pyplot as plt
+
 class DNN:
 	def __init__(self, mode, trunc, save):
 		self.weights = []
@@ -36,6 +38,12 @@ class DNN:
 
 	def __del__(self):
 		self._sess.close()
+
+	def plot_acc(self):
+		fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6,6), squeeze=False)
+		axes[0,0].plot(self._log["accuracy"])
+		axes[0,0].set_ylim(0.0,1.0)
+		plt.show()
 
 	def set_mode(self, mode):
 		self.modes[mode] = True
@@ -90,18 +98,6 @@ class DNN:
 	def set_dropout(self, src, keep_prob):
 		return tf.nn.dropout(src, keep_prob)
 
-	def set_layer_relu(self, src, src_dim, dst_dim):
-		self.weights.append(self.init_weight([src_dim, dst_dim]))
-		self.biases.append(self.init_bias([dst_dim]))
-
-		return tf.nn.relu(tf.matmul(src, self.weights[-1]) + self.biases[-1])
-
-	def set_layer_softmax(self, src, src_dim, dst_dim):
-		self.weights.append(self.init_weight([src_dim, dst_dim]))
-		self.biases.append(self.init_bias([dst_dim]))
-
-		return tf.nn.softmax(tf.matmul(src, self.weights[-1]) + self.biases[-1])
-
 	def infer(self, x, keep_prob):
 		
 		#dst = set_layer_leru(x, self.input_dim, self.hidden_dims[0])
@@ -127,12 +123,6 @@ class DNN:
 		#y = self.set_layer_softmax(dst, self.hidden_dims[-1], self.output_dim)
 
 		return y
-	
-	def calc_mse(self, y, t):
-		return tf.reduce_mean(tf.square(y - t))
-
-	def calc_cross_entropy(self, y, t):
-		return tf.reduce_mean(-tf.reduce_sum(t * tf.log(y), reduction_indices=[1]))
 
 	def train(self, loss):
 		optimizer = tf.train.AdamOptimizer(learning_rate = 0.001)
@@ -176,35 +166,6 @@ class DNN:
 			else:
 				init = tf.global_variables_initializer()
 				self._sess.run(init)
-
-		accuracy = acc_op.eval(session=self._sess,
-			feed_dict = 
-			{
-				self._x : x_test,
-				self._t : t_test,
-				self._keep_prob : 1.0
-			}
-		)
-		return accuracy
-
-	
-	def confirm(self, x_test, t_test):
-		#define model
-		y = self.infer(self._x, self._keep_prob)
-		#loss = DNN.calc_cross_entropy(y, t)
-		loss_op = self.calc_loss(y, self._t)
-		train_op = self.train(loss_op)
-
-		#define calc accuracy
-		acc_op = self.calc_accuracy(y, self._t)
-
-		ckpt = tf.train.get_checkpoint_state(self.ckpt_dir)
-		if self.has_checkpoint():
-			print(ckpt.model_checkpoint_path)
-			self.restore_session(ckpt.model_checkpoint_path)
-		else:
-			init = tf.global_variables_initializer()
-			self._sess.run(init)
 
 		accuracy = acc_op.eval(session=self._sess,
 			feed_dict = 
@@ -412,12 +373,13 @@ def main():
 
 	model.define_placeholder()
 
-	#for mnist
+	#for candle
 	(x_train, t_train), (x_test, t_test) = load_candle(normalize=True, flatten=True, one_hot_label=True, rate="1H", in_sticks=in_sticks, out_sticks=out_sticks)
 	#train_size = x_train.shape[0]
 	#batch_size = 10
 
 	if model.modes["train"] is True:
+		print("this is Train mode")
 		#epoch
 		keep_prob = 1.0
 		epochs= 64
@@ -427,10 +389,13 @@ def main():
 		accuracy = model.evaluate(x_test, t_test)
 		print("evaluate : ", accuracy)
 
+		model.plot_acc()
+
 		if model.is_save is True:
 			model.save_session()
 
 	if model.modes["eval"] is True:
+		print("This is evaluate mode")
 		accuracy = model.evaluate(x_test, t_test)
 		print(accuracy)
 
