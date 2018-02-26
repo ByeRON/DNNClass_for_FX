@@ -2,8 +2,6 @@ import numpy as np
 import tensorflow as tf
 from dataset_kebin.candle import load_candle
 
-import matplotlib.pyplot as plt
-
 class DNN:
 	def __init__(self, mode, trunc, save):
 		self.weights = []
@@ -38,12 +36,6 @@ class DNN:
 
 	def __del__(self):
 		self._sess.close()
-
-	def plot_acc(self):
-		fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6,6), squeeze=False)
-		axes[0,0].plot(self._log["accuracy"])
-		axes[0,0].set_ylim(0.0,1.0)
-		plt.show()
 
 	def set_mode(self, mode):
 		self.modes[mode] = True
@@ -131,7 +123,7 @@ class DNN:
 			dst = self.set_dropout(dst, keep_prob)
 
 		#set output layer
-		y = self.set_layer(dst, self.hidden_dims[-1], self.output_dim, "softmax")
+		y = self.set_layer(dst, self.hidden_dims[-1], self.output_dim, "identity")
 		#y = self.set_layer_softmax(dst, self.hidden_dims[-1], self.output_dim)
 
 		return y
@@ -252,9 +244,6 @@ class DNN:
 			self._sess.run(init)
 
 		batchs = x_train.shape[0] // batch_size
-		#batchs = 20
-		print("epochs : ", epochs)
-		print("batchs : ", batchs)
 
 		for epoch in range(epochs):
 			for i in range(batchs):
@@ -346,7 +335,16 @@ class Layer:
 
 		elif self.actv is "softmax":
 			return SoftmaxLayer()
+
+		elif self.actv is "tanh":
+			return TanhLayer()
+
+		elif self.actv is "sigmoid":
+			return SigmoidLayer()
 			
+		elif self.actv is "identity":
+			return IdentityLayer()
+
 		else:
 			return None
 		
@@ -364,19 +362,40 @@ class SoftmaxLayer(Layer):
 	def set(self, src, weight, bias):
 		return tf.nn.softmax(tf.matmul(src, weight) + bias)
 
-def main():
-	in_sticks = 20
-	out_sticks = 2
+class TanhLayer(Layer):
+	def __init__(self):
+		pass
 
+	def set(self, src, weight, bias):
+		return tf.nn.tanh(tf.matmul(src, weight) + bias)
+
+class SigmoidLayer(Layer):
+	def __init__(self):
+		pass
+
+	def set(self, src, weight, bias):
+		return tf.nn.sigmoid(tf.matmul(src, weight) + bias)
+
+class IdentityLayer(Layer):
+	def __init__(self):
+		pass
+
+	def set(self, src, weight, bias):
+		return tf.nn.l2_normalize(tf.matmul(src, weight) + bias)
+
+
+def main():
+	in_sticks = 2
+	out_sticks = 1
 	#layer configuration
 	input_dim = 4 * in_sticks
 	output_dim = 4 * out_sticks
-	hidden_dims = [100,100,100]
+	hidden_dims = [8,8,8,8]
 	actvs = []
 
 	#for test run without saved checkpoint
 	#model = DNN(mode="train", trunc=True, save=False)
-	model = DNN(mode="train", trunc=True, save=True)
+	model = DNN(mode="train", trunc=True, save=False)
 
 	#(should not use) for test run and destroy saved checkpoint
 	#model = DNN(mode="train", trunc=True, save=True)
@@ -393,29 +412,25 @@ def main():
 
 	model.define_placeholder()
 
-	#for candle
-	(x_train, t_train), (x_test, t_test) = load_candle(normalize=True, flatten=True, one_hot_label=True, rate = "1H", in_sticks=in_sticks, out_sticks=out_sticks)
+	#for mnist
+	(x_train, t_train), (x_test, t_test) = load_candle(normalize=True, flatten=True, one_hot_label=True, rate="1H", in_sticks=in_sticks, out_sticks=out_sticks)
 	#train_size = x_train.shape[0]
 	#batch_size = 10
 
 	if model.modes["train"] is True:
-		print("this is Train mode")
 		#epoch
-		keep_prob = 0.9
-		epochs= 128
-		batch_size = 128
+		keep_prob = 1.0
+		epochs= 64
+		batch_size = 64
 
 		model.fit(x_train, t_train, keep_prob, epochs, batch_size)
 		accuracy = model.evaluate(x_test, t_test)
 		print("evaluate : ", accuracy)
 
-		model.plot_acc()
-
 		if model.is_save is True:
 			model.save_session()
 
 	if model.modes["eval"] is True:
-		print("This is evaluate mode")
 		accuracy = model.evaluate(x_test, t_test)
 		print(accuracy)
 
